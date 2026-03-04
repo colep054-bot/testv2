@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FieldTrak — Irrigation Progress</title>
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=bebas-neue:400|barlow-condensed:400,600,700,900|barlow:400,600,700|dm-mono:400,500&display=swap" rel="stylesheet">
+<style>
+  /* Fallback font stack if webfonts fail */
+  .font-fallback-applied * {
+    font-family: system-ui, -apple-system, sans-serif !important;
+  }
+</style>
+<script>
+  // Detect if fonts loaded, apply fallback if not
+  document.fonts.ready.then(() => {
+    const loaded = [...document.fonts].some(f => f.family.includes('Bebas'));
+    if (!loaded) document.body.classList.add('font-fallback-applied');
+  });
+</script>
+<script>
+// Lightweight CSV parser (PapaParse-compatible API)
+var Papa = {
+  parse: function(str, config) {
+    config = config || {};
+    var lines = str.split(/\r?\n/);
+    var headers = [];
+    var data = [];
+    var headerLine = -1;
+    // Find first non-empty line as header
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim()) { headerLine = i; break; }
+    }
+    if (headerLine < 0) return { data: [] };
+    headers = parseLine(lines[headerLine]);
+    for (var i = headerLine + 1; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      var vals = parseLine(line);
+      if (config.header) {
+        var obj = {};
+        headers.forEach(function(h, j) { obj[h] = vals[j] !== undefined ? vals[j] : ''; });
+        data.push(obj);
+      } else {
+        data.push(vals);
+      }
+    }
+    return { data: data, meta: { fields: headers } };
+  }
+};
+function parseLine(line) {
+  var result = [], cur = '', inQ = false;
+  for (var i = 0; i < line.length; i++) {
+    var c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+</script>
+<style>
+:root {
+  --bg:       #0C0F0A;
+  --bg2:      #141714;
+  --bg3:      #1C201B;
+  --border:   #2A2F28;
+  --green:    #7ED348;
+  --lime:     #C8F135;
+  --yellow:   #F5C842;
+  --orange:   #F07D1A;
+  --teal:     #2BBFA4;
+  --blue:     #4A9EE8;
+  --red:      #E8514A;
+  --muted:    #5A6458;
+  --text:     #E8EDE6;
+  --text2:    #A8B3A5;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  min-height: 100vh;
+  cursor: default;
+}
+
+/* TOPO BACKGROUND */
+body::before {
+  content:'';
+  position:fixed; inset:0;
+  pointer-events:none; z-index:0;
+  opacity:1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cdefs%3E%3CradialGradient id='g1' cx='30%25' cy='40%25' r='60%25'%3E%3Cstop offset='0%25' stop-color='%237ED348' stop-opacity='0.07'/%3E%3Cstop offset='100%25' stop-color='%237ED348' stop-opacity='0'/%3E%3C/radialGradient%3E%3CradialGradient id='g2' cx='75%25' cy='65%25' r='50%25'%3E%3Cstop offset='0%25' stop-color='%232BBFA4' stop-opacity='0.05'/%3E%3Cstop offset='100%25' stop-color='%232BBFA4' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width='900' height='900' fill='url(%23g1)'/%3E%3Crect width='900' height='900' fill='url(%23g2)'/%3E%3Cg fill='none' stroke='%237ED348' stroke-opacity='0.055' stroke-width='1.2'%3E%3Cellipse cx='450' cy='450' rx='420' ry='280'/%3E%3Cellipse cx='450' cy='450' rx='370' ry='240'/%3E%3Cellipse cx='450' cy='450' rx='320' ry='200'/%3E%3Cellipse cx='450' cy='450' rx='270' ry='162'/%3E%3Cellipse cx='450' cy='450' rx='220' ry='126'/%3E%3Cellipse cx='450' cy='450' rx='170' ry='94'/%3E%3Cellipse cx='450' cy='450' rx='120' ry='64'/%3E%3Cellipse cx='450' cy='450' rx='72' ry='36'/%3E%3Cellipse cx='180' cy='200' rx='260' ry='160'/%3E%3Cellipse cx='180' cy='200' rx='210' ry='125'/%3E%3Cellipse cx='180' cy='200' rx='162' ry='94'/%3E%3Cellipse cx='180' cy='200' rx='116' ry='66'/%3E%3Cellipse cx='180' cy='200' rx='72' ry='40'/%3E%3Cellipse cx='180' cy='200' rx='34' ry='18'/%3E%3Cellipse cx='750' cy='180' rx='220' ry='150'/%3E%3Cellipse cx='750' cy='180' rx='175' ry='115'/%3E%3Cellipse cx='750' cy='180' rx='132' ry='84'/%3E%3Cellipse cx='750' cy='180' rx='90' ry='56'/%3E%3Cellipse cx='750' cy='180' rx='50' ry='30'/%3E%3Cellipse cx='720' cy='730' rx='300' ry='190'/%3E%3Cellipse cx='720' cy='730' rx='250' ry='154'/%3E%3Cellipse cx='720' cy='730' rx='200' ry='120'/%3E%3Cellipse cx='720' cy='730' rx='152' ry='90'/%3E%3Cellipse cx='720' cy='730' rx='106' ry='62'/%3E%3Cellipse cx='720' cy='730' rx='62' ry='36'/%3E%3Cellipse cx='100' cy='720' rx='180' ry='120'/%3E%3Cellipse cx='100' cy='720' rx='136' ry='88'/%3E%3Cellipse cx='100' cy='720' rx='94' ry='60'/%3E%3Cellipse cx='100' cy='720' rx='54' ry='34'/%3E%3C/g%3E%3Cg fill='none' stroke='%232BBFA4' stroke-opacity='0.035' stroke-width='0.9'%3E%3Cellipse cx='450' cy='450' rx='395' ry='260' transform='rotate(12 450 450)'/%3E%3Cellipse cx='450' cy='450' rx='345' ry='222' transform='rotate(12 450 450)'/%3E%3Cellipse cx='450' cy='450' rx='295' ry='186' transform='rotate(12 450 450)'/%3E%3Cellipse cx='450' cy='450' rx='245' ry='150' transform='rotate(12 450 450)'/%3E%3Cellipse cx='450' cy='450' rx='195' ry='116' transform='rotate(12 450 450)'/%3E%3Cellipse cx='300' cy='600' rx='240' ry='160'/%3E%3Cellipse cx='300' cy='600' rx='192' ry='124'/%3E%3Cellipse cx='300' cy='600' rx='146' ry='92'/%3E%3Cellipse cx='300' cy='600' rx='102' ry='62'/%3E%3Cellipse cx='300' cy='600' rx='60' ry='36'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: cover;
+  background-position: center;
+}
+
+/* ── HEADER ── */
+header {
+  position:relative; z-index:20;
+  background: var(--bg2);
+  border-bottom: 2px solid var(--green);
+  display:flex; align-items:stretch;
+  padding: 0 1.5rem;
+  gap: 1.5rem;
+  border-radius:0 0 16px 16px;
+}
+
+.logo {
+  display:flex; align-items:center; gap:0.8rem;
+  padding: 1rem 1.5rem 1rem 0;
+  border-right: 1px solid var(--border);
+}
+
+.logo-icon {
+  width:38px; height:38px;
+  background: var(--green);
+  display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+}
+
+.logo h1 {
+  font-family:'Bebas Neue','bebas-neue',Impact,sans-serif;
+  font-size:2rem; letter-spacing:3px; line-height:1;
+  color: var(--green);
+}
+.logo sub {
+  display:block;
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.62rem; font-weight:700; letter-spacing:4px;
+  color: var(--muted); text-transform:uppercase;
+}
+
+.header-info {
+  display:flex; flex-direction:column; justify-content:center; gap:3px;
+  padding: 0.8rem 0;
+}
+.header-info strong {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:1rem; font-weight:900; letter-spacing:1px;
+  color:var(--text);
+}
+.header-info small { font-size:0.72rem; color:var(--muted); font-weight:600; }
+
+.header-right {
+  margin-left:auto;
+  display:flex; align-items:center; gap:0.8rem;
+  padding: 0.8rem 0;
+}
+
+/* UPLOAD ZONE */
+.upload-zone {
+  position:relative;
+  border: 2px dashed var(--border);
+  padding: 0.5rem 1.2rem;
+  display:flex; align-items:center; gap:0.7rem;
+  cursor:pointer;
+  transition: border-color 0.2s, background 0.2s;
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.78rem; font-weight:700; letter-spacing:2px;
+  text-transform:uppercase; color:var(--muted);
+  border-radius:8px;
+}
+.upload-zone:hover, .upload-zone.drag { border-color:var(--green); color:var(--green); background:rgba(126,211,72,0.05); }
+.upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.upload-zone .up-icon { font-size:1.1rem; }
+
+.btn {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.78rem; font-weight:900; letter-spacing:2px; text-transform:uppercase;
+  border:none; cursor:pointer; padding:0.5rem 1.1rem;
+  transition: all 0.15s;
+  border-radius:8px;
+}
+.btn-green { background:var(--green); color:#0C0F0A; }
+.btn-green:hover { background:var(--lime); }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text2); }
+.btn-outline:hover { border-color:var(--green); color:var(--green); }
+
+/* ── FILTER BAR ── */
+.filterbar {
+  position:relative; z-index:15;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  padding:0.6rem 1.5rem;
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+  border-radius:12px;
+  margin: 0.8rem 1.5rem 0;
+  border: 1px solid var(--border);
+}
+.filterbar label {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.65rem; font-weight:700; letter-spacing:3px;
+  text-transform:uppercase; color:var(--muted);
+}
+.filterbar select, .filterbar input {
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--text); font-family:'Barlow','barlow',system-ui,sans-serif; font-size:0.82rem;
+  padding:0.35rem 0.7rem; outline:none;
+  transition:border-color 0.2s;
+  border-radius:6px;
+}
+.filterbar select:focus, .filterbar input:focus { border-color:var(--green); }
+
+.search-wrap { position:relative; }
+.search-wrap input { padding-left:1.8rem; width:180px; }
+.search-icon { position:absolute; left:0.5rem; top:50%; transform:translateY(-50%); color:var(--muted); font-size:0.8rem; }
+
+.chip-group { display:flex; gap:0.4rem; flex-wrap:wrap; }
+.chip {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.68rem; font-weight:700; letter-spacing:1px;
+  padding:0.25rem 0.7rem; border:1px solid var(--border); color:var(--muted);
+  cursor:pointer; transition:all 0.15s; text-transform:uppercase;
+  border-radius:20px;
+}
+.chip:hover { border-color:var(--green); color:var(--green); }
+.chip.active { background:var(--green); color:#0C0F0A; border-color:var(--green); }
+
+.filterbar-right { margin-left:auto; display:flex; align-items:center; gap:0.5rem; }
+#row-count { font-family:'DM Mono','dm-mono','Courier New',monospace; font-size:0.75rem; color:var(--muted); }
+
+/* ── MAIN ── */
+main { position:relative; z-index:5; padding:1.5rem; display:flex; flex-direction:column; gap:1.5rem; }
+
+/* ── SUMMARY STRIP ── */
+.summary-strip {
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+  gap:10px;
+  background:transparent;
+  border:none;
+}
+
+.sum-card {
+  background:var(--bg2);
+  padding:1.1rem 1.2rem;
+  display:flex; flex-direction:column; gap:4px;
+  cursor:pointer;
+  transition:background 0.15s;
+  position:relative; overflow:hidden;
+  border-radius:10px;
+}
+.sum-card:hover { background:var(--bg3); }
+.sum-card.highlighted { background:rgba(126,211,72,0.08); }
+.sum-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:3px;
+}
+.sum-card:nth-child(1)::before { background:var(--green); }
+.sum-card:nth-child(2)::before { background:var(--teal); }
+.sum-card:nth-child(3)::before { background:var(--yellow); }
+.sum-card:nth-child(4)::before { background:var(--orange); }
+.sum-card:nth-child(5)::before { background:var(--blue); }
+.sum-card:nth-child(6)::before { background:var(--red); }
+.sum-card:nth-child(7)::before { background:var(--lime); }
+.sum-card:nth-child(8)::before { background:var(--muted); }
+
+.sum-val {
+  font-family:'Bebas Neue','bebas-neue',Impact,sans-serif;
+  font-size:2.2rem; line-height:1; letter-spacing:1px;
+}
+.sum-label {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.62rem; font-weight:700; letter-spacing:3px;
+  text-transform:uppercase; color:var(--muted);
+}
+.sum-unit { font-size:0.65rem; color:var(--muted); font-weight:600; }
+
+/* ── CONTENT GRID ── */
+.content-grid {
+  display:grid;
+  grid-template-columns: 1fr 320px;
+  gap:1.5rem;
+}
+@media(max-width:900px){ .content-grid{ grid-template-columns:1fr; } }
+
+/* ── TABLE ── */
+.table-panel { display:flex; flex-direction:column; gap:0; }
+
+.panel-head {
+  background:var(--bg2);
+  border:1px solid var(--border); border-bottom:none;
+  padding:0.7rem 1rem;
+  display:flex; align-items:center; gap:0.8rem;
+  border-radius:12px 12px 0 0;
+}
+.panel-head h2 {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.75rem; font-weight:900; letter-spacing:3px; text-transform:uppercase; color:var(--muted);
+}
+.panel-head .line { flex:1; height:1px; background:var(--border); }
+
+.table-wrap {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  overflow:auto;
+  max-height:520px;
+  border-radius:0 0 12px 12px;
+}
+.table-wrap::-webkit-scrollbar { width:6px; height:6px; }
+.table-wrap::-webkit-scrollbar-track { background:var(--bg2); }
+.table-wrap::-webkit-scrollbar-thumb { background:var(--border); }
+.table-wrap::-webkit-scrollbar-thumb:hover { background:var(--green); }
+
+table { width:100%; border-collapse:collapse; }
+
+thead tr {
+  background:var(--bg3);
+  position:sticky; top:0; z-index:5;
+}
+
+thead th {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.65rem; font-weight:900; letter-spacing:2px; text-transform:uppercase;
+  color:var(--muted); padding:0.7rem 0.9rem;
+  text-align:left; white-space:nowrap;
+  cursor:pointer; user-select:none;
+  border-bottom:1px solid var(--border);
+  transition:color 0.15s;
+}
+thead th:hover { color:var(--green); }
+thead th.sort-asc::after { content:' ↑'; color:var(--green); }
+thead th.sort-desc::after { content:' ↓'; color:var(--green); }
+
+tbody tr {
+  border-bottom:1px solid rgba(42,47,40,0.7);
+  transition:background 0.1s;
+  cursor:pointer;
+}
+tbody tr:hover { background:rgba(126,211,72,0.05); }
+tbody tr.selected { background:rgba(126,211,72,0.1); outline:1px solid rgba(126,211,72,0.3); }
+
+tbody td {
+  padding:0.7rem 0.9rem;
+  font-size:0.83rem;
+  vertical-align:middle;
+  white-space:nowrap;
+}
+
+.job-cell strong { display:block; font-weight:700; font-size:0.88rem; }
+.job-cell small { font-family:'DM Mono','dm-mono','Courier New',monospace; font-size:0.65rem; color:var(--muted); }
+
+.collector-tag {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.7rem; font-weight:700; letter-spacing:1px;
+  padding:0.2rem 0.55rem;
+  background:rgba(126,211,72,0.1);
+  color:var(--green);
+  border:1px solid rgba(126,211,72,0.2);
+  white-space:nowrap;
+  border-radius:20px;
+}
+
+.num-cell {
+  font-family:'DM Mono','dm-mono','Courier New',monospace;
+  font-size:0.82rem; text-align:right;
+}
+.num-cell.zero { color:var(--border); }
+.num-cell.has-val { color:var(--lime); font-weight:500; }
+
+.unit-tag {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.6rem; font-weight:700; letter-spacing:1px;
+  color:var(--muted); margin-left:2px;
+}
+
+/* ── SIDE PANEL ── */
+.side-panels { display:flex; flex-direction:column; gap:1rem; }
+
+.side-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  overflow:hidden;
+  border-radius:12px;
+}
+.side-card-head {
+  padding:0.7rem 1rem;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.side-card-head h3 {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.7rem; font-weight:900; letter-spacing:3px; text-transform:uppercase; color:var(--muted);
+}
+.side-card-body { padding:1rem; }
+
+/* BAR CHART */
+.horiz-bars { display:flex; flex-direction:column; gap:0.6rem; }
+.hbar-row { display:flex; flex-direction:column; gap:3px; }
+.hbar-meta { display:flex; justify-content:space-between; align-items:baseline; }
+.hbar-name { font-size:0.75rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:170px; }
+.hbar-val { font-family:'DM Mono','dm-mono','Courier New',monospace; font-size:0.72rem; color:var(--lime); }
+.hbar-track { height:5px; background:var(--bg3); }
+.hbar-fill { height:100%; transition:width 0.9s cubic-bezier(0.16,1,0.3,1); }
+
+/* DETAIL CARD */
+.detail-empty {
+  font-size:0.78rem; color:var(--muted); font-style:italic;
+  text-align:center; padding:1.5rem 0;
+}
+.detail-title { font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:1.1rem; font-weight:900; letter-spacing:1px; margin-bottom:0.8rem; }
+.detail-collector { display:inline-flex; align-items:center; gap:0.4rem; margin-bottom:1rem; }
+.detail-collector span { font-size:0.72rem; font-weight:600; color:var(--green); }
+.detail-items { display:flex; flex-direction:column; gap:0.45rem; max-height:320px; overflow-y:auto; }
+.detail-item { display:flex; justify-content:space-between; align-items:center; padding:0.35rem 0; border-bottom:1px solid var(--border); gap:0.5rem; }
+.detail-item:last-child { border-bottom:none; }
+.di-name { font-size:0.75rem; color:var(--text2); flex:1; }
+.di-val { font-family:'DM Mono','dm-mono','Courier New',monospace; font-size:0.8rem; color:var(--lime); font-weight:500; white-space:nowrap; }
+.di-unit { font-size:0.62rem; color:var(--muted); }
+
+/* COLUMN TOGGLE */
+.col-toggle-grid { display:flex; flex-wrap:wrap; gap:0.35rem; }
+.col-chip {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.62rem; font-weight:700; letter-spacing:0.5px;
+  padding:0.2rem 0.5rem; border:1px solid var(--border); color:var(--muted);
+  cursor:pointer; transition:all 0.12s; text-transform:uppercase;
+  border-radius:20px;
+}
+.col-chip:hover { border-color:var(--green); color:var(--green); }
+.col-chip.on { background:rgba(126,211,72,0.12); border-color:rgba(126,211,72,0.4); color:var(--green); }
+
+/* TOOLTIP */
+.tooltip {
+  position:fixed; z-index:999;
+  background:var(--bg3); border:1px solid var(--green);
+  padding:0.5rem 0.8rem;
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.78rem; font-weight:600; letter-spacing:0.5px;
+  pointer-events:none; opacity:0; transition:opacity 0.15s;
+  max-width:220px;
+  border-radius:8px;
+}
+.tooltip.show { opacity:1; }
+
+/* EMPTY STATE */
+.empty-state {
+  text-align:center; padding:4rem 2rem;
+  display:flex; flex-direction:column; align-items:center; gap:1rem;
+}
+.empty-icon { font-size:3rem; opacity:0.3; }
+.empty-title {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:1.3rem; font-weight:900; letter-spacing:2px; color:var(--muted);
+}
+.empty-sub { font-size:0.85rem; color:var(--muted); }
+.drop-hint {
+  border:2px dashed var(--border); padding:1.5rem 3rem;
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.85rem; font-weight:700;
+  letter-spacing:2px; text-transform:uppercase; color:var(--muted);
+  transition:all 0.2s; margin-top:0.5rem; cursor:pointer; position:relative;
+}
+.drop-hint input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.drop-hint:hover, body.dragging .drop-hint { border-color:var(--green); color:var(--green); background:rgba(126,211,72,0.04); }
+
+/* DRAG OVERLAY */
+.drag-overlay {
+  position:fixed; inset:0; z-index:900;
+  background:rgba(12,15,10,0.92);
+  display:flex; align-items:center; justify-content:center;
+  flex-direction:column; gap:1rem;
+  opacity:0; pointer-events:none; transition:opacity 0.2s;
+}
+.drag-overlay.show { opacity:1; pointer-events:all; }
+.drag-overlay .drag-box {
+  border:3px dashed var(--green);
+  padding:3rem 5rem;
+  text-align:center;
+}
+.drag-overlay .drag-box h2 {
+  font-family:'Bebas Neue','bebas-neue',Impact,sans-serif; font-size:3rem; letter-spacing:3px; color:var(--green);
+}
+.drag-overlay .drag-box p {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.85rem; letter-spacing:2px; color:var(--muted); text-transform:uppercase;
+}
+
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+.animate-in { animation:fadeIn 0.4s ease both; }
+
+/* ── PIE CHARTS ROW ── */
+.pie-row {
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:1.5rem;
+}
+@media(max-width:700px){ .pie-row{ grid-template-columns:1fr; } }
+
+.pie-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  overflow:hidden;
+  border-radius:12px;
+}
+.pie-card-head {
+  padding:0.7rem 1rem;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.pie-card-head h3 {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.7rem; font-weight:900; letter-spacing:3px; text-transform:uppercase; color:var(--muted);
+}
+.pie-card-body {
+  padding:1.2rem;
+  display:flex; align-items:center; gap:1.5rem;
+}
+.pie-svg-wrap { flex-shrink:0; position:relative; }
+.pie-svg-wrap svg { display:block; }
+.pie-center-label {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  pointer-events:none;
+}
+.pie-center-val {
+  font-family:'Bebas Neue','bebas-neue',Impact,sans-serif;
+  font-size:1.6rem; line-height:1; color:var(--text);
+}
+.pie-center-sub {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.55rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted);
+}
+.pie-legend {
+  flex:1; display:flex; flex-direction:column; gap:0.55rem; overflow-y:auto; max-height:220px;
+}
+.pie-legend::-webkit-scrollbar { width:3px; }
+.pie-legend::-webkit-scrollbar-thumb { background:var(--border); }
+.pie-leg-item {
+  display:flex; align-items:center; gap:0.5rem;
+  cursor:pointer; padding:0.2rem 0.3rem;
+  border-radius:0; transition:background 0.1s;
+}
+.pie-leg-item:hover { background:rgba(126,211,72,0.06); }
+.pie-leg-item.dimmed { opacity:0.35; }
+.pie-leg-dot { width:8px; height:8px; flex-shrink:0; }
+.pie-leg-name {
+  font-size:0.74rem; font-weight:600; flex:1;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pie-leg-val {
+  font-family:'DM Mono','dm-mono','Courier New',monospace; font-size:0.72rem; color:var(--lime);
+}
+.pie-leg-pct {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.65rem; font-weight:700;
+  color:var(--muted); min-width:32px; text-align:right;
+}
+/* Slice hover highlight */
+.pie-slice { transition:opacity 0.15s, transform 0.15s; cursor:pointer; transform-origin:center; }
+.pie-slice:hover { opacity:0.85; transform:scale(1.04); }
+/* ── MONTHLY HISTORY ── */
+.history-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+}
+.history-head {
+  padding:0.8rem 1.2rem;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+}
+.history-head h2 {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.75rem; font-weight:900; letter-spacing:3px; text-transform:uppercase; color:var(--muted);
+  flex:1;
+}
+.month-input-wrap { display:flex; align-items:center; gap:0.5rem; }
+.month-input-wrap label { font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.65rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--muted); }
+.month-input-wrap input[type="month"] {
+  background:var(--bg3); border:1px solid var(--border); color:var(--text);
+  font-family:'Barlow','barlow',system-ui,sans-serif; font-size:0.82rem;
+  padding:0.35rem 0.7rem; outline:none; border-radius:6px;
+  transition:border-color 0.2s;
+}
+.month-input-wrap input[type="month"]:focus { border-color:var(--green); }
+.history-body { padding:1.2rem; display:flex; flex-direction:column; gap:1.2rem; }
+.line-graph-wrap { position:relative; width:100%; }
+.line-graph-wrap svg { width:100%; display:block; }
+.lg-grid line { stroke:var(--border); stroke-width:1; }
+.lg-axis text { font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:10px; font-weight:700; fill:var(--muted); letter-spacing:1px; }
+.lg-line { fill:none; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; }
+.lg-dot { cursor:pointer; transition:r 0.15s; }
+.lg-dot:hover { r:6; }
+.lg-area { opacity:0.08; }
+.line-legend { display:flex; gap:1rem; flex-wrap:wrap; }
+.line-leg-item { display:flex; align-items:center; gap:0.4rem; font-size:0.72rem; font-weight:600; cursor:pointer; padding:0.2rem 0.5rem; border-radius:20px; border:1px solid transparent; transition:all 0.15s; }
+.line-leg-item:hover { border-color:var(--border); }
+.line-leg-item.hidden { opacity:0.3; }
+.line-leg-dot { width:10px; height:3px; border-radius:2px; flex-shrink:0; }
+.snapshot-list { display:flex; flex-direction:column; gap:0.5rem; max-height:180px; overflow-y:auto; }
+.snapshot-list::-webkit-scrollbar { width:4px; }
+.snapshot-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+.snapshot-row { display:flex; align-items:center; gap:0.8rem; padding:0.5rem 0.7rem; background:var(--bg3); border-radius:8px; border:1px solid var(--border); transition:border-color 0.15s; }
+.snapshot-row:hover { border-color:var(--green); }
+.snap-month { font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-weight:900; font-size:0.85rem; letter-spacing:1px; color:var(--green); min-width:80px; }
+.snap-stats { flex:1; font-size:0.72rem; color:var(--text2); }
+.snap-del { background:transparent; border:1px solid var(--border); color:var(--muted); font-size:0.7rem; padding:0.15rem 0.4rem; border-radius:4px; cursor:pointer; transition:all 0.15s; font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-weight:700; }
+.snap-del:hover { border-color:var(--red); color:var(--red); }
+.snap-empty { font-size:0.78rem; color:var(--muted); font-style:italic; text-align:center; padding:1rem 0; }
+.lg-tip { position:absolute; pointer-events:none; background:var(--bg3); border:1px solid var(--green); border-radius:8px; padding:0.5rem 0.8rem; font-size:0.75rem; opacity:0; transition:opacity 0.15s; white-space:nowrap; z-index:50; }
+.lg-tip.show { opacity:1; }
+.lg-tip strong { font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif; font-size:0.9rem; font-weight:900; color:var(--green); display:block; }
+
+/* ── LEADERBOARD ── */
+.leaderboard-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:12px;
+  overflow:hidden;
+}
+.lb-head {
+  padding:0.85rem 1.2rem;
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:1rem;
+  background: linear-gradient(90deg, rgba(126,211,72,0.06) 0%, transparent 60%);
+}
+.lb-head h2 {
+  font-family:'Bebas Neue','bebas-neue',Impact,sans-serif;
+  font-size:1.5rem; letter-spacing:3px; color:var(--green);
+  flex:1;
+}
+.lb-sub {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.65rem; font-weight:700; letter-spacing:3px;
+  text-transform:uppercase; color:var(--muted);
+}
+.lb-body { padding:1rem 1.2rem 1.2rem; display:flex; flex-direction:column; gap:0.6rem; }
+
+.lb-row {
+  display:grid;
+  grid-template-columns: 42px 1fr auto auto;
+  align-items:center; gap:0.8rem;
+  padding:0.7rem 0.9rem;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:var(--bg3);
+  transition:all 0.2s;
+  cursor:default;
+  position:relative; overflow:hidden;
+}
+.lb-row::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px;
+}
+.lb-row:nth-child(1)::before { background: linear-gradient(180deg,#FFD700,#FFA500); }
+.lb-row:nth-child(2)::before { background: linear-gradient(180deg,#C0C0C0,#909090); }
+.lb-row:nth-child(3)::before { background: linear-gradient(180deg,#CD7F32,#8B4513); }
+.lb-row:nth-child(n+4)::before { background:var(--border); }
+.lb-row:hover { border-color:var(--green); transform:translateX(3px); background:rgba(126,211,72,0.04); }
+
+.lb-rank {
+  font-family:'Bebas Neue','bebas-neue',Impact,sans-serif;
+  font-size:1.6rem; line-height:1; text-align:center;
+}
+.lb-rank.r1 { color:#FFD700; text-shadow: 0 0 12px rgba(255,215,0,0.4); }
+.lb-rank.r2 { color:#C0C0C0; }
+.lb-rank.r3 { color:#CD7F32; }
+.lb-rank.rn { color:var(--muted); font-size:1.1rem; }
+
+.lb-medal { font-size:1.3rem; }
+
+.lb-info { display:flex; flex-direction:column; gap:2px; }
+.lb-name {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:1rem; font-weight:900; letter-spacing:1px;
+  color:var(--text);
+}
+.lb-name.r1 { color:#FFD700; }
+.lb-meta {
+  font-size:0.68rem; color:var(--muted); font-weight:600;
+}
+
+.lb-bar-wrap {
+  display:flex; flex-direction:column; align-items:flex-end; gap:3px; min-width:140px;
+}
+.lb-bar-track {
+  width:100%; height:6px; background:var(--bg); border-radius:3px; overflow:hidden;
+}
+.lb-bar-fill {
+  height:100%; border-radius:3px;
+  transition: width 1s cubic-bezier(0.16,1,0.3,1);
+}
+.lb-score-wrap { text-align:right; min-width:80px; }
+.lb-score {
+  font-family:'Bebas Neue','bebas-neue',Impact,sans-serif;
+  font-size:1.4rem; line-height:1; letter-spacing:1px;
+}
+.lb-score.r1 { color:#FFD700; }
+.lb-score.r2 { color:#C0C0C0; }
+.lb-score.r3 { color:#CD7F32; }
+.lb-score-unit {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.6rem; font-weight:700; letter-spacing:2px;
+  text-transform:uppercase; color:var(--muted);
+}
+
+.lb-delta {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.68rem; font-weight:700; letter-spacing:1px;
+  padding:0.1rem 0.4rem; border-radius:20px;
+}
+.lb-delta.up { background:rgba(126,211,72,0.15); color:var(--green); }
+.lb-delta.down { background:rgba(232,81,74,0.15); color:var(--red); }
+.lb-delta.same { color:var(--muted); }
+
+.lb-tabs {
+  display:flex; gap:0.4rem;
+}
+.lb-tab {
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.65rem; font-weight:900; letter-spacing:2px; text-transform:uppercase;
+  padding:0.25rem 0.7rem; border:1px solid var(--border); color:var(--muted);
+  cursor:pointer; border-radius:20px; transition:all 0.15s;
+}
+.lb-tab:hover { border-color:var(--green); color:var(--green); }
+.lb-tab.active { background:var(--green); color:#0C0F0A; border-color:var(--green); }
+
+.lb-empty {
+  text-align:center; padding:2rem;
+  font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;
+  font-size:0.85rem; letter-spacing:2px; color:var(--muted); text-transform:uppercase;
+}
+
+/* Podium glow for top 3 */
+.lb-row:nth-child(1) { box-shadow: 0 0 0 1px rgba(255,215,0,0.15), inset 0 0 30px rgba(255,215,0,0.03); }
+.lb-row:nth-child(2) { box-shadow: 0 0 0 1px rgba(192,192,192,0.1); }
+.lb-row:nth-child(3) { box-shadow: 0 0 0 1px rgba(205,127,50,0.1); }
+
+</style>
+</head>
+<body>
+
+<!-- DRAG OVERLAY -->
+<div class="drag-overlay" id="drag-overlay">
+  <div class="drag-box">
+    <h2>Drop CSV / Excel</h2>
+    <p>Release to load your data</p>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">💧</div>
+    <div>
+      <h1>FieldTrak</h1>
+      <sub>Irrigation Progress</sub>
+    </div>
+  </div>
+  <div class="header-info">
+    <strong id="project-label">No data loaded</strong>
+    <small id="last-updated">Drop a CSV/Excel file to begin</small>
+  </div>
+  <div class="header-right">
+    <div class="upload-zone" id="upload-zone">
+      <span class="up-icon">📂</span>
+      <span>Load CSV / Excel</span>
+      <input type="file" id="file-input" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])">
+    </div>
+    <button class="btn btn-outline" onclick="exportCSV()">Export CSV</button>
+  </div>
+</header>
+
+<!-- FILTER BAR -->
+<div class="filterbar">
+  <label>Job</label>
+  <select id="filter-job" onchange="applyFilters()">
+    <option value="all">All Jobs</option>
+  </select>
+  <label>Collector</label>
+  <select id="filter-collector" onchange="applyFilters()">
+    <option value="all">All Collectors</option>
+  </select>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search" placeholder="Search…" oninput="applyFilters()">
+  </div>
+  <label style="margin-left:0.5rem">Show</label>
+  <div class="chip-group" id="show-chips">
+    <div class="chip active" data-show="all" onclick="setShow('all',this)">All Cols</div>
+    <div class="chip" data-show="filled" onclick="setShow('filled',this)">With Data Only</div>
+  </div>
+  <div class="filterbar-right">
+    <span id="row-count">—</span>
+    <button class="btn btn-outline" onclick="resetFilters()">Reset</button>
+  </div>
+</div>
+
+<main>
+  <!-- SUMMARY -->
+  <div class="summary-strip" id="summary-strip" style="display:none"></div>
+
+  <!-- LEADERBOARD -->
+  <div class="leaderboard-card" id="lb-card" style="display:none">
+    <div class="lb-head">
+      <h2>🏆 High Score Board</h2>
+      <div class="lb-tabs" id="lb-tabs">
+        <div class="lb-tab active" onclick="setLbMode('alltime',this)">All Time</div>
+        <div class="lb-tab" onclick="setLbMode('current',this)">This Load</div>
+        <div class="lb-tab" onclick="setLbMode('lastmonth',this)">Last Month</div>
+      </div>
+      <span class="lb-sub" id="lb-sub-label">UNITS INSTALLED</span>
+    </div>
+    <div class="lb-body" id="lb-body">
+      <div class="lb-empty">Load a CSV to populate the leaderboard</div>
+    </div>
+  </div>
+
+  <!-- PIE CHARTS -->
+  <div class="pie-row" id="pie-row" style="display:none">
+    <div class="pie-card">
+      <div class="pie-card-head">
+        <h3>Units Installed by Collector</h3>
+        <span style="font-size:0.62rem;color:var(--muted);font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;letter-spacing:2px;">HOVER TO EXPLORE</span>
+      </div>
+      <div class="pie-card-body" id="pie-collector-body"></div>
+    </div>
+    <div class="pie-card">
+      <div class="pie-card-head">
+        <h3>Units Installed by Job</h3>
+        <span style="font-size:0.62rem;color:var(--muted);font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;letter-spacing:2px;">HOVER TO EXPLORE</span>
+      </div>
+      <div class="pie-card-body" id="pie-job-body"></div>
+    </div>
+  </div>
+
+  <!-- MONTHLY HISTORY PANEL -->
+  <div class="history-card" id="history-card" style="display:none">
+    <div class="history-head">
+      <h2>Month-to-Month Progress</h2>
+      <div class="month-input-wrap">
+        <label>Month</label>
+        <input type="month" id="snap-month-input">
+      </div>
+      <button class="btn btn-green" onclick="saveSnapshot()" id="save-snap-btn" style="opacity:0.4;cursor:not-allowed">Save This Month</button>
+    </div>
+    <div class="history-body">
+      <div>
+        <div style="font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;font-size:0.65rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:0.7rem;">TREND — Total Units Installed</div>
+        <div class="line-legend" id="line-legend"></div>
+        <div class="line-graph-wrap" style="margin-top:0.8rem">
+          <svg id="line-svg" height="220" viewBox="0 0 900 220"></svg>
+          <div class="lg-tip" id="lg-tip"></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;font-size:0.65rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:0.6rem;">SAVED SNAPSHOTS</div>
+        <div class="snapshot-list" id="snapshot-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content-grid" id="content-grid" style="display:none">
+    <!-- TABLE -->
+    <div class="table-panel">
+      <div class="panel-head">
+        <h2>Installation Records</h2>
+        <div class="line"></div>
+      </div>
+      <div class="table-wrap">
+        <table id="main-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SIDE -->
+    <div class="side-panels">
+      <!-- DETAIL -->
+      <div class="side-card">
+        <div class="side-card-head">
+          <h3>Row Detail</h3>
+          <span style="font-size:0.65rem;color:var(--muted);font-family:'Barlow Condensed','barlow-condensed','Arial Narrow',Arial,sans-serif;letter-spacing:2px;">CLICK A ROW</span>
+        </div>
+        <div class="side-card-body" id="detail-panel">
+          <div class="detail-empty">Click any row to see installed item breakdown</div>
+        </div>
+      </div>
+
+      <!-- TOP ITEMS -->
+      <div class="side-card">
+        <div class="side-card-head"><h3>Top Items Installed</h3></div>
+        <div class="side-card-body">
+          <div class="horiz-bars" id="top-bars"></div>
+        </div>
+      </div>
+
+      <!-- COLUMN TOGGLE -->
+      <div class="side-card">
+        <div class="side-card-head"><h3>Column Visibility</h3></div>
+        <div class="side-card-body">
+          <div class="col-toggle-grid" id="col-toggle"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPTY STATE -->
+  <div class="empty-state" id="empty-state">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">No Data Loaded</div>
+    <div class="empty-sub">Load your irrigation recap CSV or Excel file to get started</div>
+    <div class="drop-hint">
+      ⬆ Drop file here or click to browse
+      <input type="file" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])">
+    </div>
+  </div>
+</main>
+
+<script>
+// ── STATE ──
+let allRows = [];       // parsed rows [{Job, Collector, col:val, ...}]
+let columns = [];       // all data columns (after Job, Collector)
+let units = {};         // col -> unit string
+let visibleCols = new Set();
+let showMode = 'all';   // 'all' | 'filled'
+let filteredRows = [];
+let sortCol = null;
+let sortDir = 1;
+let selectedRow = null;
+
+// ── FILE HANDLING ──
+function handleFile(file) {
+  if (!file) return;
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'csv') {
+    const reader = new FileReader();
+    reader.onload = e => parseCSV(e.target.result);
+    reader.readAsText(file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    // Use SheetJS via CDN if available, else prompt CSV
+    loadSheetJS(file);
+  }
+}
+
+function loadSheetJS(file) {
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  script.onload = () => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const csv = XLSX.utils.sheet_to_csv(ws);
+      parseCSV(csv);
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  document.head.appendChild(script);
+}
+
+function parseCSV(text) {
+  const result = Papa.parse(text, { header:true, skipEmptyLines:true });
+  if (!result.data.length) return;
+
+  const raw = result.data;
+  const meta = raw[0]; // first row has units (or empty)
+  const dataRows = raw.slice(1).filter(r => r['Job'] && r['Job'].trim());
+
+  // Extract unit row (row index 0 after header = raw[0])
+  // The unit row has "LF" etc in some cells
+  units = {};
+  const keys = Object.keys(meta);
+  keys.forEach(k => {
+    if (k !== 'Job' && k !== 'Collector') {
+      const v = (meta[k] || '').trim();
+      if (v) units[k] = v;
+    }
+  });
+
+  columns = keys.filter(k => k !== 'Job' && k !== 'Collector');
+  visibleCols = new Set(columns);
+
+  allRows = dataRows.map(r => {
+    const out = { Job: r['Job']?.trim(), Collector: r['Collector']?.trim() };
+    columns.forEach(c => {
+      const v = r[c];
+      out[c] = (v === undefined || v === null || v === '') ? null : isNaN(+v) ? v : +v;
+    });
+    return out;
+  });
+
+  initUI();
+  applyFilters();
+}
+
+// ── INIT UI ──
+function initUI() {
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('content-grid').style.display = 'grid';
+  document.getElementById('summary-strip').style.display = 'grid';
+  document.getElementById('pie-row').style.display = 'grid';
+  document.getElementById('history-card').style.display = 'block';
+  document.getElementById('lb-card').style.display = 'block';
+  // Enable save button now that data is loaded
+  const btn = document.getElementById('save-snap-btn');
+  btn.style.opacity = '1'; btn.style.cursor = 'pointer';
+  // Set default month to current
+  const now = new Date();
+  document.getElementById('snap-month-input').value = now.toISOString().slice(0,7);
+  renderSnapshotList();
+  renderLineGraph();
+
+  // Populate filter dropdowns
+  const jobs = [...new Set(allRows.map(r => r.Job))].sort();
+  const collectors = [...new Set(allRows.map(r => r.Collector).filter(Boolean))].sort();
+
+  const fJob = document.getElementById('filter-job');
+  fJob.innerHTML = '<option value="all">All Jobs</option>' + jobs.map(j => `<option>${j}</option>`).join('');
+  const fCol = document.getElementById('filter-collector');
+  fCol.innerHTML = '<option value="all">All Collectors</option>' + collectors.map(c => `<option>${c}</option>`).join('');
+
+  // Column toggle chips
+  const ct = document.getElementById('col-toggle');
+  ct.innerHTML = columns.map(c => `
+    <div class="col-chip on" data-col="${c}" onclick="toggleCol('${c}',this)" title="${c}">${c.replace(/_/g,' ').substring(0,14)}</div>
+  `).join('');
+
+  // Project label
+  document.getElementById('project-label').textContent = [...new Set(allRows.map(r => r.Job))].join(' · ').substring(0,60) || 'Loaded';
+  document.getElementById('last-updated').textContent = `Loaded ${new Date().toLocaleString()} · ${allRows.length} records`;
+}
+
+// ── FILTERS ──
+function applyFilters() {
+  const job = document.getElementById('filter-job').value;
+  const col = document.getElementById('filter-collector').value;
+  const q   = document.getElementById('search').value.toLowerCase();
+
+  filteredRows = allRows.filter(r => {
+    if (job !== 'all' && r.Job !== job) return false;
+    if (col !== 'all' && r.Collector !== col) return false;
+    if (q && !r.Job?.toLowerCase().includes(q) && !r.Collector?.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  if (sortCol) {
+    filteredRows.sort((a,b) => {
+      const av = a[sortCol] ?? -Infinity, bv = b[sortCol] ?? -Infinity;
+      if (typeof av === 'string') return av.localeCompare(bv) * sortDir;
+      return (av - bv) * sortDir;
+    });
+  }
+
+  renderTable();
+  renderSummary();
+  renderTopBars();
+  renderPies();
+  renderLeaderboard();
+  document.getElementById('row-count').textContent = `${filteredRows.length} row${filteredRows.length!==1?'s':''}`;
+}
+
+function resetFilters() {
+  document.getElementById('filter-job').value = 'all';
+  document.getElementById('filter-collector').value = 'all';
+  document.getElementById('search').value = '';
+  applyFilters();
+}
+
+function setShow(mode, el) {
+  showMode = mode;
+  document.querySelectorAll('#show-chips .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function toggleCol(col, el) {
+  if (visibleCols.has(col)) { visibleCols.delete(col); el.classList.remove('on'); }
+  else { visibleCols.add(col); el.classList.add('on'); }
+  renderTable();
+}
+
+// ── RENDER TABLE ──
+function renderTable() {
+  // Determine which cols to show
+  let showCols = columns.filter(c => visibleCols.has(c));
+  if (showMode === 'filled') {
+    // only show cols that have at least one non-null value in filteredRows
+    showCols = showCols.filter(c => filteredRows.some(r => r[c] !== null && r[c] !== 0 && r[c] !== ''));
+  }
+
+  // HEAD
+  const thead = document.getElementById('table-head');
+  thead.innerHTML = `<tr>
+    <th onclick="doSort('Job')" class="${sortCol==='Job'?(sortDir===1?'sort-asc':'sort-desc'):''}">Job</th>
+    <th onclick="doSort('Collector')" class="${sortCol==='Collector'?(sortDir===1?'sort-asc':'sort-desc'):''}">Collector</th>
+    ${showCols.map(c => `
+      <th onclick="doSort('${c}')"
+          class="${sortCol===c?(sortDir===1?'sort-asc':'sort-desc'):''}"
+          onmouseenter="showTip(event,'${c}${units[c]?' ('+units[c]+')':''}')"
+          onmouseleave="hideTip()">
+        ${c.replace(/_/g,' ')}${units[c]?`<br><span style="font-size:0.55rem;color:var(--border)">${units[c]}</span>`:''}
+      </th>
+    `).join('')}
+  </tr>`;
+
+  // BODY
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = filteredRows.map((r, i) => {
+    const cells = showCols.map(c => {
+      const v = r[c];
+      const isEmpty = v === null || v === undefined || v === '';
+      const cls = isEmpty ? 'num-cell zero' : 'num-cell has-val';
+      const display = isEmpty ? '—' : (typeof v === 'number' ? v.toLocaleString() : v);
+      const unitStr = units[c] ? `<span class="unit-tag">${units[c]}</span>` : '';
+      return `<td class="${cls}" onmouseenter="showTip(event,'${c}: ${display} ${units[c]||''}')" onmouseleave="hideTip()">${display}${!isEmpty && units[c]?unitStr:''}</td>`;
+    }).join('');
+
+    return `<tr data-idx="${i}" onclick="selectRow(${i},this)" class="${selectedRow===i?'selected':''}">
+      <td class="job-cell"><strong>${r.Job}</strong></td>
+      <td><span class="collector-tag">${r.Collector||'—'}</span></td>
+      ${cells}
+    </tr>`;
+  }).join('');
+}
+
+function doSort(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  applyFilters();
+}
+
+// ── SELECT ROW ──
+function selectRow(idx, el) {
+  selectedRow = idx;
+  document.querySelectorAll('#table-body tr').forEach(r => r.classList.remove('selected'));
+  el.classList.add('selected');
+  renderDetail(filteredRows[idx]);
+}
+
+function renderDetail(row) {
+  if (!row) return;
+  const items = columns
+    .filter(c => row[c] !== null && row[c] !== undefined && row[c] !== '' && row[c] !== 0)
+    .map(c => ({ name:c, val:row[c], unit:units[c]||'' }));
+
+  const panel = document.getElementById('detail-panel');
+  if (!items.length) {
+    panel.innerHTML = `<div class="detail-empty">No installed items for this row</div>`; return;
+  }
+  panel.innerHTML = `
+    <div class="detail-title">${row.Job}</div>
+    <div class="detail-collector">
+      <span class="collector-tag">${row.Collector||'Unknown'}</span>
+    </div>
+    <div class="detail-items">
+      ${items.map(it => `
+        <div class="detail-item">
+          <span class="di-name">${it.name.replace(/_/g,' ')}</span>
+          <span class="di-val">${typeof it.val==='number'?it.val.toLocaleString():it.val}</span>
+          <span class="di-unit">${it.unit}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// ── SUMMARY ──
+function renderSummary() {
+  const totalJobs = new Set(filteredRows.map(r => r.Job)).size;
+  const totalCollectors = new Set(filteredRows.map(r => r.Collector).filter(Boolean)).size;
+
+  // Aggregate all numeric columns
+  const totals = {};
+  columns.forEach(c => {
+    const sum = filteredRows.reduce((a, r) => a + (typeof r[c]==='number' ? r[c] : 0), 0);
+    if (sum > 0) totals[c] = sum;
+  });
+
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  const top3 = sorted.slice(0,3);
+  const grandTotal = sorted.reduce((a,[,v])=>a+v, 0);
+
+  // LF total
+  const lfCols = columns.filter(c => units[c]==='LF');
+  const lfTotal = lfCols.reduce((a,c)=> a + filteredRows.reduce((s,r)=> s+(typeof r[c]==='number'?r[c]:0), 0), 0);
+
+  const cards = [
+    { label:'Jobs', val: totalJobs, unit:'', color:'var(--green)' },
+    { label:'Collectors', val: totalCollectors, unit:'', color:'var(--teal)' },
+    { label:'Total Units', val: grandTotal.toLocaleString(), unit:'installed', color:'var(--yellow)' },
+    { label:'Linear Feet', val: lfTotal.toLocaleString(), unit:'LF', color:'var(--orange)' },
+    ...top3.map(([c,v],i) => ({ label:c.replace(/_/g,' '), val:v.toLocaleString(), unit:units[c]||'EA', color:['var(--blue)','var(--red)','var(--lime)'][i] })),
+  ];
+
+  document.getElementById('summary-strip').innerHTML = cards.map(c => `
+    <div class="sum-card animate-in">
+      <div class="sum-val" style="color:${c.color}">${c.val}</div>
+      <div class="sum-unit">${c.unit}</div>
+      <div class="sum-label">${c.label}</div>
+    </div>
+  `).join('');
+}
+
+// ── TOP BARS ──
+function renderTopBars() {
+  const totals = {};
+  columns.forEach(c => {
+    const sum = filteredRows.reduce((a,r) => a+(typeof r[c]==='number'?r[c]:0), 0);
+    if (sum > 0) totals[c] = sum;
+  });
+  const sorted = Object.entries(totals).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const max = sorted[0]?.[1] || 1;
+  const colors = ['var(--green)','var(--teal)','var(--yellow)','var(--orange)','var(--blue)','var(--red)','var(--lime)','var(--green)','var(--teal)','var(--yellow)'];
+
+  document.getElementById('top-bars').innerHTML = sorted.map(([c,v],i) => `
+    <div class="hbar-row animate-in">
+      <div class="hbar-meta">
+        <span class="hbar-name">${c.replace(/_/g,' ')}</span>
+        <span class="hbar-val">${v.toLocaleString()}${units[c]?' '+units[c]:''}</span>
+      </div>
+      <div class="hbar-track">
+        <div class="hbar-fill" style="width:${Math.round(v/max*100)}%;background:${colors[i%colors.length]}"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── PIE CHARTS ──
+const PIE_COLORS = [
+  '#7ED348','#2BBFA4','#F5C842','#F07D1A','#4A9EE8','#E8514A','#C8F135',
+  '#A855F7','#EC4899','#14B8A6','#F97316','#64748B'
+];
+
+function buildPieData(groupKey) {
+  const totals = {};
+  filteredRows.forEach(r => {
+    const grp = r[groupKey] || 'Unknown';
+    if (!totals[grp]) totals[grp] = 0;
+    columns.forEach(c => { totals[grp] += (typeof r[c]==='number' ? r[c] : 0); });
+  });
+  const entries = Object.entries(totals).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const grand = entries.reduce((s,[,v])=>s+v,0) || 1;
+  return { entries, grand };
+}
+
+function renderPie(containerId, groupKey) {
+  const container = document.getElementById(containerId);
+  const { entries, grand } = buildPieData(groupKey);
+  if (!entries.length) { container.innerHTML = '<span style="color:var(--muted);font-size:0.8rem">No data</span>'; return; }
+
+  const SIZE = 180, CX = 90, CY = 90, R = 72, INNER = 42;
+  let svgSlices = '';
+  let angle = -Math.PI / 2;
+  const sliceData = [];
+
+  entries.forEach(([name, val], i) => {
+    const frac = val / grand;
+    const sweep = frac * 2 * Math.PI;
+    const x1 = CX + R * Math.cos(angle);
+    const y1 = CY + R * Math.sin(angle);
+    angle += sweep;
+    const x2 = CX + R * Math.cos(angle);
+    const y2 = CY + R * Math.sin(angle);
+    const xi1 = CX + INNER * Math.cos(angle - sweep);
+    const yi1 = CY + INNER * Math.sin(angle - sweep);
+    const xi2 = CX + INNER * Math.cos(angle);
+    const yi2 = CY + INNER * Math.sin(angle);
+    const large = sweep > Math.PI ? 1 : 0;
+    const color = PIE_COLORS[i % PIE_COLORS.length];
+    const pct = Math.round(frac * 100);
+    const d = `M ${xi1} ${yi1} L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} L ${xi2} ${yi2} A ${INNER} ${INNER} 0 ${large} 0 ${xi1} ${yi1} Z`;
+    sliceData.push({ name, val, pct, color, d, i });
+    svgSlices += `<path class="pie-slice" d="${d}" fill="${color}" data-idx="${i}"
+      onmouseenter="pieHover('${containerId}',${i},'${name.replace(/'/g,"\\'")}',${val},${pct})"
+      onmouseleave="pieUnhover('${containerId}')"
+      onclick="pieClick('${containerId}',${i})"/>`;
+  });
+
+  container.innerHTML = `
+    <div class="pie-svg-wrap">
+      <svg width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" id="svg-${containerId}">${svgSlices}</svg>
+      <div class="pie-center-label" id="center-${containerId}">
+        <span class="pie-center-val">${entries.length}</span>
+        <span class="pie-center-sub">${groupKey === 'Collector' ? 'collectors' : 'jobs'}</span>
+      </div>
+    </div>
+    <div class="pie-legend" id="legend-${containerId}">
+      ${sliceData.map(s => `
+        <div class="pie-leg-item" data-idx="${s.i}"
+          onmouseenter="pieHover('${containerId}',${s.i},'${s.name.replace(/'/g,"\\'")}',${s.val},${s.pct})"
+          onmouseleave="pieUnhover('${containerId}')"
+          onclick="pieClick('${containerId}',${s.i})">
+          <div class="pie-leg-dot" style="background:${s.color}"></div>
+          <span class="pie-leg-name" title="${s.name}">${s.name}</span>
+          <span class="pie-leg-val">${s.val.toLocaleString()}</span>
+          <span class="pie-leg-pct">${s.pct}%</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  // store slice data for interactions
+  container._sliceData = sliceData;
+  container._grand = grand;
+}
+
+function renderPies() {
+  renderPie('pie-collector-body', 'Collector');
+  renderPie('pie-job-body', 'Job');
+}
+
+let pieSelected = {};
+
+function pieHover(containerId, idx, name, val, pct) {
+  if (pieSelected[containerId] !== undefined) return; // locked to click
+  _highlightPie(containerId, idx, name, val, pct);
+}
+
+function pieUnhover(containerId) {
+  if (pieSelected[containerId] !== undefined) return;
+  _resetPie(containerId);
+}
+
+function pieClick(containerId, idx) {
+  if (pieSelected[containerId] === idx) {
+    pieSelected[containerId] = undefined;
+    _resetPie(containerId);
+  } else {
+    pieSelected[containerId] = idx;
+    const container = document.getElementById(containerId);
+    const s = container._sliceData[idx];
+    _highlightPie(containerId, idx, s.name, s.val, s.pct);
+  }
+}
+
+function _highlightPie(containerId, idx, name, val, pct) {
+  const svg = document.getElementById(`svg-${containerId}`);
+  const legend = document.getElementById(`legend-${containerId}`);
+  const center = document.getElementById(`center-${containerId}`);
+  if (!svg) return;
+  svg.querySelectorAll('.pie-slice').forEach((el,i) => el.style.opacity = i===idx?'1':'0.3');
+  legend.querySelectorAll('.pie-leg-item').forEach((el,i) => {
+    el.classList.toggle('dimmed', i!==idx);
+  });
+  center.innerHTML = `
+    <span class="pie-center-val" style="font-size:1.1rem">${val.toLocaleString()}</span>
+    <span class="pie-center-sub">${pct}%</span>
+  `;
+}
+
+function _resetPie(containerId) {
+  const svg = document.getElementById(`svg-${containerId}`);
+  const legend = document.getElementById(`legend-${containerId}`);
+  const center = document.getElementById(`center-${containerId}`);
+  const container = document.getElementById(containerId);
+  if (!svg) return;
+  svg.querySelectorAll('.pie-slice').forEach(el => el.style.opacity = '1');
+  legend.querySelectorAll('.pie-leg-item').forEach(el => el.classList.remove('dimmed'));
+  const n = container._sliceData?.length || 0;
+  center.innerHTML = `
+    <span class="pie-center-val">${n}</span>
+    <span class="pie-center-sub">${containerId.includes('collector')?'collectors':'jobs'}</span>
+  `;
+}
+
+
+const tip = document.getElementById('tooltip');
+function showTip(e, text) {
+  tip.textContent = text;
+  tip.classList.add('show');
+  moveTip(e);
+}
+function moveTip(e) {
+  tip.style.left = (e.clientX + 12) + 'px';
+  tip.style.top  = (e.clientY + 12) + 'px';
+}
+function hideTip() { tip.classList.remove('show'); }
+document.addEventListener('mousemove', e => { if(tip.classList.contains('show')) moveTip(e); });
+
+// ── EXPORT ──
+function exportCSV() {
+  if (!allRows.length) return;
+  const cols = ['Job','Collector',...columns];
+  const rows = filteredRows.map(r => cols.map(c => r[c] ?? '').join(','));
+  const csv = [cols.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = 'fieldtrak-export.csv';
+  a.click();
+}
+
+// ── DRAG & DROP ──
+const overlay = document.getElementById('drag-overlay');
+document.addEventListener('dragover', e => { e.preventDefault(); overlay.classList.add('show'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) overlay.classList.remove('show'); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  overlay.classList.remove('show');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+
+
+// ── LEADERBOARD ──
+let lbMode = 'alltime';
+
+function setLbMode(mode, el) {
+  lbMode = mode;
+  document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderLeaderboard();
+}
+
+function renderLeaderboard() {
+  const body = document.getElementById('lb-body');
+  const subLabel = document.getElementById('lb-sub-label');
+  const snaps = loadSnapshots();
+  const medals = ['🥇','🥈','🥉'];
+  const rankClass = i => ['r1','r2','r3'][i] || 'rn';
+  const colors = ['#FFD700','#C0C0C0','#CD7F32'];
+
+  let scores = {}; // collector -> total
+  let prevScores = {}; // for delta comparison
+
+  if (lbMode === 'alltime') {
+    // Sum across ALL snapshots
+    snaps.forEach(s => {
+      Object.entries(s.collectorTotals || {}).forEach(([c,v]) => {
+        scores[c] = (scores[c] || 0) + v;
+      });
+    });
+    // prev = all snapshots except most recent
+    const prevSnaps = snaps.slice(0, -1);
+    prevSnaps.forEach(s => {
+      Object.entries(s.collectorTotals || {}).forEach(([c,v]) => {
+        prevScores[c] = (prevScores[c] || 0) + v;
+      });
+    });
+    subLabel.textContent = 'ALL-TIME UNITS INSTALLED';
+  } else if (lbMode === 'current') {
+    // Use currently loaded filteredRows
+    const collectors = [...new Set(filteredRows.map(r => r.Collector).filter(Boolean))];
+    collectors.forEach(col => {
+      const rows = filteredRows.filter(r => r.Collector === col);
+      scores[col] = columns.reduce((s,c) => s + rows.reduce((a,r) => a+(typeof r[c]==='number'?r[c]:0), 0), 0);
+    });
+    // prev from last snapshot
+    const lastSnap = snaps[snaps.length - 1];
+    if (lastSnap) prevScores = lastSnap.collectorTotals || {};
+    subLabel.textContent = 'CURRENT LOAD — UNITS INSTALLED';
+  } else if (lbMode === 'lastmonth') {
+    // Use the most recent snapshot
+    const lastSnap = snaps[snaps.length - 1];
+    const prevSnap = snaps[snaps.length - 2];
+    if (lastSnap) scores = { ...lastSnap.collectorTotals };
+    if (prevSnap) prevScores = { ...prevSnap.collectorTotals };
+    const label = lastSnap ? fmtMonth(lastSnap.month) : 'LAST MONTH';
+    subLabel.textContent = label.toUpperCase() + ' — UNITS INSTALLED';
+  }
+
+  const entries = Object.entries(scores).sort((a,b) => b[1] - a[1]);
+  if (!entries.length) {
+    body.innerHTML = '<div class="lb-empty">No data for this view yet</div>';
+    return;
+  }
+
+  const maxScore = entries[0][1] || 1;
+  const grandTotal = entries.reduce((s,[,v])=>s+v,0);
+
+  body.innerHTML = entries.map(([name, score], i) => {
+    const prev = prevScores[name];
+    let deltaHtml = '';
+    if (prev !== undefined && prev !== score) {
+      const diff = score - prev;
+      const sign = diff > 0 ? '+' : '';
+      const cls = diff > 0 ? 'up' : 'down';
+      deltaHtml = `<span class="lb-delta ${cls}">${sign}${Math.abs(diff).toLocaleString()}</span>`;
+    }
+
+    const pct = Math.round(score / maxScore * 100);
+    const sharePct = Math.round(score / grandTotal * 100);
+    const rc = rankClass(i);
+    const color = colors[i] || 'var(--green)';
+    const medal = medals[i] || '';
+    const rankDisplay = i < 3 ? `<span class="lb-medal">${medal}</span>` : `<span class="lb-rank rn">${i+1}</span>`;
+
+    return `<div class="lb-row" style="animation:slideUp 0.4s ease ${i*0.07}s both">
+      <div style="text-align:center;line-height:1">${rankDisplay}</div>
+      <div class="lb-info">
+        <span class="lb-name ${rc}">${name.replace(/_/g,' ')}</span>
+        <span class="lb-meta">${sharePct}% of total ${deltaHtml}</span>
+      </div>
+      <div class="lb-bar-wrap">
+        <div class="lb-bar-track" style="width:120px">
+          <div class="lb-bar-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+      </div>
+      <div class="lb-score-wrap">
+        <div class="lb-score ${rc}">${score.toLocaleString()}</div>
+        <div class="lb-score-unit">units</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── MONTHLY HISTORY ──
+const STORAGE_KEY = 'fieldtrak_snapshots';
+const LINE_COLORS = ['#7ED348','#2BBFA4','#F5C842','#F07D1A','#4A9EE8','#E8514A','#C8F135','#A855F7'];
+let hiddenLines = new Set();
+
+function loadSnapshots() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch(e) { return []; }
+}
+
+function saveSnapshots(snaps) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(snaps));
+}
+
+function saveSnapshot() {
+  if (!allRows.length) return;
+  const monthVal = document.getElementById('snap-month-input').value;
+  if (!monthVal) { alert('Please select a month first.'); return; }
+
+  // Aggregate totals per collector
+  const collectors = [...new Set(allRows.map(r => r.Collector).filter(Boolean))];
+  const collectorTotals = {};
+  collectors.forEach(col => {
+    const rows = allRows.filter(r => r.Collector === col);
+    collectorTotals[col] = columns.reduce((s,c) => s + rows.reduce((a,r) => a+(typeof r[c]==='number'?r[c]:0), 0), 0);
+  });
+  const grandTotal = Object.values(collectorTotals).reduce((a,b)=>a+b, 0);
+  const jobs = [...new Set(allRows.map(r => r.Job))];
+
+  const snap = {
+    month: monthVal,
+    grandTotal,
+    collectorTotals,
+    jobs,
+    savedAt: new Date().toISOString()
+  };
+
+  const snaps = loadSnapshots();
+  // Replace if same month
+  const idx = snaps.findIndex(s => s.month === monthVal);
+  if (idx >= 0) {
+    if (!confirm(`A snapshot for ${fmtMonth(monthVal)} already exists. Overwrite it?`)) return;
+    snaps[idx] = snap;
+  } else {
+    snaps.push(snap);
+  }
+  snaps.sort((a,b) => a.month.localeCompare(b.month));
+  saveSnapshots(snaps);
+  renderSnapshotList();
+  renderLineGraph();
+  // Flash button
+  const btn = document.getElementById('save-snap-btn');
+  btn.textContent = '✓ Saved!';
+  btn.style.background = 'var(--teal)';
+  setTimeout(() => { btn.textContent = 'Save This Month'; btn.style.background = ''; }, 1800);
+}
+
+function deleteSnapshot(month) {
+  if (!confirm(`Delete snapshot for ${fmtMonth(month)}?`)) return;
+  const snaps = loadSnapshots().filter(s => s.month !== month);
+  saveSnapshots(snaps);
+  renderSnapshotList();
+  renderLineGraph();
+}
+
+function fmtMonth(val) {
+  // "2024-03" -> "Mar 2024"
+  const [y,m] = val.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(m)-1] + ' ' + y;
+}
+
+function renderSnapshotList() {
+  const snaps = loadSnapshots();
+  const el = document.getElementById('snapshot-list');
+  if (!snaps.length) {
+    el.innerHTML = '<div class="snap-empty">No snapshots saved yet. Load a CSV and click "Save This Month".</div>';
+    return;
+  }
+  el.innerHTML = snaps.slice().reverse().map(s => {
+    const cols = Object.entries(s.collectorTotals || {}).map(([c,v])=>`${c}: ${v.toLocaleString()}`).join(' · ');
+    return `<div class="snapshot-row">
+      <span class="snap-month">${fmtMonth(s.month)}</span>
+      <span class="snap-stats">${s.grandTotal.toLocaleString()} units · ${cols}</span>
+      <button class="snap-del" onclick="deleteSnapshot('${s.month}')">✕ Delete</button>
+    </div>`;
+  }).join('');
+}
+
+function renderLineGraph() {
+  const snaps = loadSnapshots();
+  const svg = document.getElementById('line-svg');
+  const legend = document.getElementById('line-legend');
+  if (!svg) return;
+
+  if (snaps.length < 1) {
+    svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" font-family="Barlow Condensed" font-size="13" fill="#5A6458" letter-spacing="2">SAVE AT LEAST ONE SNAPSHOT TO SEE TRENDS</text>';
+    legend.innerHTML = '';
+    return;
+  }
+
+  // Gather all collectors across all snapshots
+  const allCollectors = [...new Set(snaps.flatMap(s => Object.keys(s.collectorTotals || {})))];
+  // Build series: one per collector + one for grand total
+  const series = [
+    { name:'Total', color:'#7ED348', values: snaps.map(s => s.grandTotal) },
+    ...allCollectors.map((col, i) => ({
+      name: col,
+      color: LINE_COLORS[(i+1) % LINE_COLORS.length],
+      values: snaps.map(s => (s.collectorTotals||{})[col] || 0)
+    }))
+  ];
+
+  const W = 900, H = 220, PAD = { top:16, right:20, bottom:36, left:64 };
+  const gW = W - PAD.left - PAD.right;
+  const gH = H - PAD.top - PAD.bottom;
+  const n = snaps.length;
+  const allVals = series.flatMap(s => s.values).filter(v=>!isNaN(v));
+  const maxVal = Math.max(...allVals, 1);
+  const minVal = 0;
+
+  const xPos = i => PAD.left + (n === 1 ? gW/2 : i / (n-1) * gW);
+  const yPos = v => PAD.top + gH - ((v - minVal) / (maxVal - minVal)) * gH;
+
+  // Grid lines
+  const gridCount = 4;
+  let gridLines = '';
+  for (let g = 0; g <= gridCount; g++) {
+    const y = PAD.top + (g / gridCount) * gH;
+    const val = Math.round(maxVal * (1 - g/gridCount));
+    gridLines += `<line x1="${PAD.left}" y1="${y}" x2="${W - PAD.right}" y2="${y}" class="lg-grid" style="stroke:var(--border);stroke-width:1"/>`;
+    gridLines += `<text x="${PAD.left - 8}" y="${y+4}" text-anchor="end" class="lg-axis">${val >= 1000 ? (val/1000).toFixed(1)+'k' : val}</text>`;
+  }
+
+  // X axis labels
+  let xLabels = snaps.map((s,i) => `<text x="${xPos(i)}" y="${H - 6}" text-anchor="middle" class="lg-axis">${fmtMonth(s.month)}</text>`).join('');
+
+  // Series paths
+  let paths = '';
+  series.forEach(ser => {
+    if (hiddenLines.has(ser.name)) return;
+    if (n === 1) {
+      // Single point — just a dot
+      const x = xPos(0), y = yPos(ser.values[0]);
+      paths += `<circle cx="${x}" cy="${y}" r="5" fill="${ser.color}" class="lg-dot"
+        onmouseenter="lgTip(event,'${ser.name}','${fmtMonth(snaps[0].month)}',${ser.values[0]})"
+        onmouseleave="lgHideTip()"/>`;
+      return;
+    }
+    const pts = ser.values.map((v,i) => `${xPos(i)},${yPos(v)}`).join(' ');
+    // Area fill
+    const areaD = `M ${xPos(0)},${yPos(0)} ` +
+      ser.values.map((v,i)=>`${xPos(i)},${yPos(v)}`).join(' L ') +
+      ` L ${xPos(n-1)},${PAD.top+gH} L ${xPos(0)},${PAD.top+gH} Z`;
+    paths += `<path d="${areaD}" fill="${ser.color}" class="lg-area"/>`;
+    paths += `<polyline points="${pts}" class="lg-line" style="stroke:${ser.color}"/>`;
+    // Dots
+    ser.values.forEach((v,i) => {
+      paths += `<circle cx="${xPos(i)}" cy="${yPos(v)}" r="4" fill="${ser.color}" stroke="var(--bg)" stroke-width="2" class="lg-dot"
+        onmouseenter="lgTip(event,'${ser.name}','${fmtMonth(snaps[i].month)}',${v})"
+        onmouseleave="lgHideTip()"/>`;
+    });
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = `<g class="lg-grid">${gridLines}</g><g class="lg-axis">${xLabels}</g>${paths}`;
+
+  // Legend
+  legend.innerHTML = series.map(ser => `
+    <div class="line-leg-item ${hiddenLines.has(ser.name)?'hidden':''}" onclick="toggleLine('${ser.name}')">
+      <div class="line-leg-dot" style="background:${ser.color}"></div>
+      <span>${ser.name}</span>
+    </div>
+  `).join('');
+}
+
+function toggleLine(name) {
+  if (hiddenLines.has(name)) hiddenLines.delete(name);
+  else hiddenLines.add(name);
+  renderLineGraph();
+}
+
+function lgTip(e, series, month, val) {
+  const tip = document.getElementById('lg-tip');
+  tip.innerHTML = `<strong>${val.toLocaleString()} units</strong>${series} · ${month}`;
+  tip.classList.add('show');
+  const rect = document.getElementById('line-svg').parentElement.getBoundingClientRect();
+  tip.style.left = (e.clientX - rect.left + 12) + 'px';
+  tip.style.top  = (e.clientY - rect.top - 40) + 'px';
+}
+function lgHideTip() { document.getElementById('lg-tip').classList.remove('show'); }
+
+// Init snapshot list on load (even before CSV)
+renderSnapshotList();
+renderLineGraph();
+
+
+// ── SEED SAMPLE MONTHLY SNAPSHOTS ──
+function seedSampleSnapshots() {
+  const version = 'v2-sam-wins';
+  if (localStorage.getItem('fieldtrak_seed_ver') === version) return;
+  localStorage.setItem('fieldtrak_seed_ver', version);
+
+  const sampleSnaps = [
+    {
+      month: '2024-10',
+      grandTotal: 18400,
+      collectorTotals: { Sam_GPS: 9800, Dustin_GPS: 5200, Cole_GPS: 3400 },
+      jobs: ['9999 Big Oak GC', '8888 Hillside GC'],
+      savedAt: '2024-10-31T17:00:00.000Z'
+    },
+    {
+      month: '2024-11',
+      grandTotal: 34700,
+      collectorTotals: { Sam_GPS: 18600, Dustin_GPS: 9800, Cole_GPS: 6300 },
+      jobs: ['9999 Big Oak GC', '8888 Hillside GC'],
+      savedAt: '2024-11-30T17:00:00.000Z'
+    },
+    {
+      month: '2024-12',
+      grandTotal: 49200,
+      collectorTotals: { Sam_GPS: 26100, Dustin_GPS: 13800, Cole_GPS: 9300 },
+      jobs: ['9999 Big Oak GC', '8888 Hillside GC'],
+      savedAt: '2024-12-31T17:00:00.000Z'
+    },
+    {
+      month: '2025-01',
+      grandTotal: 58600,
+      collectorTotals: { Sam_GPS: 31400, Dustin_GPS: 16200, Cole_GPS: 11000 },
+      jobs: ['9999 Big Oak GC', '8888 Hillside GC'],
+      savedAt: '2025-01-31T17:00:00.000Z'
+    },
+    {
+      month: '2025-02',
+      grandTotal: 71300,
+      collectorTotals: { Sam_GPS: 38500, Dustin_GPS: 19600, Cole_GPS: 13200 },
+      jobs: ['9999 Big Oak GC', '8888 Hillside GC'],
+      savedAt: '2025-02-28T17:00:00.000Z'
+    },
+    {
+      month: '2025-03',
+      grandTotal: 86500,
+      collectorTotals: { Sam_GPS: 47200, Dustin_GPS: 23100, Cole_GPS: 16200 },
+      jobs: ['9999 Big Oak GC', '8888 Hillside GC'],
+      savedAt: '2025-03-31T17:00:00.000Z'
+    },
+  ];
+
+  saveSnapshots(sampleSnaps);
+  renderSnapshotList();
+  renderLineGraph();
+}
+
+seedSampleSnapshots();
+
+// ── LOAD DEMO DATA ON START ──
+// Pre-load the sample CSV so dashboard isn't empty
+const DEMO_CSV = `Job,Collector,PRV,Blow Off Valve,Winter Water Hydrant,Winter Water Lateral Valve,Bunker Valve,Drip Valve,Blow Valve,Drain_Valve,Point of Connection,Toro_Head,Satellite,Ground Plate,Rain Bird Head,Quick_Coupler,Part_Circle,Well,Existing Head,Isolation_Valve,Pump Station,Wire_Splice,Sprinkler-Generic,Air Relief Valve,Full_Circle,Hunter_Head,Lateral_Valve,2 Wire Surge Device,Electric_Valve,Backflow,Power Wire,Weather Station Cable,Pump Cable,Comm Cable,Wire Trench,Mainline,Lateral,Sump,Flushout,Daylight,Basin,Perf Drainage Pipe,Solid Drainage Pipe,Silt Fence,Initial Disturbance,Point_Generic,Line Generic,Cart Path Centerline,Bridge,Creek,Building,Green,Bunker Island,Bunker,Tee,Fairway,Sod,Rough,Native,Lake,Cart Path Area,Area Generic
+9999 Big Oak GC,Dustin_GPS,,,,,,,,,,,,,,,,,,,,,,,,,,,,,LF,LF,LF,LF,LF,LF,LF,,,,,LF,LF,LF,,,LF,LF,,,,,,,,,,,,,,
+9999 Big Oak GC,Dustin_GPS,2,1,,1,,,2,3,4,180,,2,,6,180,,,4,1,3,,2,,120,,2,16,1,4500,,,6200,8200,14800,22000,,,,,,,2400,1800,600,,,,,,,,,,,,,
+9999 Big Oak GC,Cole_GPS,1,,,2,4,6,1,2,2,220,2,1,40,4,220,,,6,,6,4,1,4,260,8,4,22,1,3200,600,,4100,6400,10200,16800,,,,,,,1900,1400,480,,,,,,,,,,,,,
+8888 Hillside GC,Sam_GPS,1,2,4,2,,4,3,6,2,140,1,,20,2,140,1,,2,1,4,2,2,2,80,4,2,12,1,2800,400,300,3600,5200,8400,14200,,,,,,,1600,1200,390,,,,,,,,,,,,,`;
+
+parseCSV(DEMO_CSV);
+</script>
+</body>
+</html>
